@@ -1,0 +1,41 @@
+50:               <p className="text-primary-100 text-sm">Điểm trung bình</p>
+51:               <p className="text-2xl font-bold">{profile?.avg_quiz_score ? Math.round(profile.avg_quiz_score) : 0}</p>
+52:             </div>
+53:           </div>
+54:           <div className="bg-white/10 rounded-xl p-4 flex items-center backdrop-blur-sm">
+55:             <div className="p-3 bg-white/20 rounded-lg mr-4">
+56:               <ChartBarIcon className="h-6 w-6 text-green-300" />
+57:             </div>
+58:             <div>
+59:               <p className="text-primary-100 text-sm">Bài đã học</p>
+60:               <p className="text-2xl font-bold">{profile?.total_items_completed || 0}</p>
+61:             </div>
+62:           </div>
+63:           <div className="bg-white/10 rounded-xl p-4 flex items-center backdrop-blur-sm">
+64:             <div className="p-3 bg-white/20 rounded-lg mr-4">
+65:               <FireIcon className="h-6 w-6 text-red-300" />
+66:             </div>
+67:             <div>
+68:               <p className="text-primary-100 text-sm">Chuỗi học tập</p>
+69:               <p className="text-2xl font-bold">1 ngày</p>
+70:             </div>
+71:           </div>
+72:         </div>
+73:       </div>
+74: 
+75:       <div className="mt-8">
+76:         <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
+77:           <SparklesIcon className="h-6 w-6 text-primary-500 mr-2" />
+78:           AI Gợi ý cho bạn
+79:         </h2>
+80:         
+81:         {recommendations.length > 0 ? (
+82:           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+83:             {recommendations.map((rec, idx) => (
+84:               <motion.div 
+85:                 key={rec.id}
+86:                 initial={{ opacity: 0, y: 20 }}
+87:                 animate={{ opacity: 1, y: 0 }}
+88:                 transition={{ delay: idx * 0.1 }}
+89:                 className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow"
+90:               >
