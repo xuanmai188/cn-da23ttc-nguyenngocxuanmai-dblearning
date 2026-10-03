@@ -38,6 +38,21 @@ class LearningItemBase(BaseModel):
     keywords: Optional[List[str]] = None
     estimated_minutes: Optional[int] = 15
 
+class LearningItemCreate(LearningItemBase):
+    pass
+
+class LearningItemUpdate(BaseModel):
+    topic_id: Optional[int] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    content_type: Optional[str] = None
+    difficulty: Optional[str] = None
+    content_url: Optional[str] = None
+    content_body: Optional[str] = None
+    keywords: Optional[List[str]] = None
+    estimated_minutes: Optional[int] = None
+    is_active: Optional[bool] = None
+
 class LearningItem(LearningItemBase):
     id: int
     view_count: int

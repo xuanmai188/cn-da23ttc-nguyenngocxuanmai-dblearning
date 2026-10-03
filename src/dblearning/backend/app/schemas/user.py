@@ -8,6 +8,7 @@ from datetime import datetime
 class UserBase(BaseModel):
     email: str
     full_name: str
+    contact_email: Optional[str] = None
     avatar_url: Optional[str] = None
     phone_number: Optional[str] = None
 
@@ -15,6 +16,7 @@ class UserBase(BaseModel):
 # Properties to receive via API on creation
 class UserCreate(UserBase):
     password: str
+    role: str = "student"
 
     @field_validator('password')
     @classmethod
@@ -56,6 +58,9 @@ class ResetPasswordRequest(BaseModel):
 # Properties to receive via API on update
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
+    contact_email: Optional[str] = None
+    role: Optional[str] = None
+    is_active: Optional[bool] = None
     avatar_url: Optional[str] = None
     phone_number: Optional[str] = None
     password: Optional[str] = None

@@ -1,4 +1,205 @@
 -- ============================================================
+-- DB LEARNING - SCHEMA AND SEED DATA (COMBINED)
+-- ============================================================
+
+-- ============================================================
+-- DB LEARNING - MySQL Schema
+-- Môn: Cơ sở Dữ liệu - Hệ thống Cá nhân hóa Lộ trình Học tập
+-- ============================================================
+
+SET NAMES utf8mb4;
+SET CHARACTER SET utf8mb4;
+
+-- ─── 1. USERS ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS users (
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    email           VARCHAR(255) NOT NULL UNIQUE,
+    password_hash   VARCHAR(255) NOT NULL,
+    full_name       VARCHAR(255) NOT NULL,
+    avatar_url      VARCHAR(500) DEFAULT NULL,
+    role            ENUM('student', 'admin') DEFAULT 'student',
+    is_active       BOOLEAN DEFAULT TRUE,
+    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_email (email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ─── 2. TOPICS ────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS topics (
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    name            VARCHAR(255) NOT NULL UNIQUE,
+    slug            VARCHAR(255) NOT NULL UNIQUE,
+    description     TEXT,
+    icon            VARCHAR(100) DEFAULT 'book',
+    color           VARCHAR(20)  DEFAULT '#6366f1',
+    order_index     INT DEFAULT 0,
+    is_active       BOOLEAN DEFAULT TRUE,
+    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ─── 3. LEARNING ITEMS ────────────────────────────────────
+CREATE TABLE IF NOT EXISTS learning_items (
+    id                  INT AUTO_INCREMENT PRIMARY KEY,
+    topic_id            INT NOT NULL,
+    title               VARCHAR(500) NOT NULL,
+    description         TEXT,
+    content_type        ENUM('document','video','flashcard_set','quiz') NOT NULL,
+    difficulty          ENUM('beginner','intermediate','advanced') NOT NULL DEFAULT 'beginner',
+    content_url         VARCHAR(1000) DEFAULT NULL,
+    keywords            JSON DEFAULT NULL,
+    tfidf_vector        JSON DEFAULT NULL,
+    estimated_minutes   INT DEFAULT 15,
+    view_count          INT DEFAULT 0,
+    is_active           BOOLEAN DEFAULT TRUE,
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE RESTRICT,
+    INDEX idx_topic (topic_id),
+    INDEX idx_content_type (content_type),
+    INDEX idx_difficulty (difficulty)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ─── 4. FLASHCARDS ────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS flashcards (
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    item_id         INT NOT NULL,
+    question        TEXT NOT NULL,
+    answer          TEXT NOT NULL,
+    hint            VARCHAR(500) DEFAULT NULL,
+    order_index     INT DEFAULT 0,
+    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (item_id) REFERENCES learning_items(id) ON DELETE CASCADE,
+    INDEX idx_item (item_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ─── 5. QUIZZES ───────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS quizzes (
+    id                      INT AUTO_INCREMENT PRIMARY KEY,
+    item_id                 INT NOT NULL UNIQUE,
+    title                   VARCHAR(500) NOT NULL,
+    description             TEXT,
+    time_limit_minutes      INT DEFAULT 30,
+    pass_score              INT DEFAULT 60,
+    shuffle_questions       BOOLEAN DEFAULT TRUE,
+    total_questions         INT DEFAULT 0,
+    created_at              DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (item_id) REFERENCES learning_items(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ─── 6. QUESTIONS ─────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS questions (
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    quiz_id         INT NOT NULL,
+    topic_id        INT NOT NULL,
+    content         TEXT NOT NULL,
+    options         JSON NOT NULL,
+    correct_option  INT NOT NULL,
+    explanation     TEXT DEFAULT NULL,
+    difficulty      ENUM('easy','medium','hard') DEFAULT 'medium',
+    order_index     INT DEFAULT 0,
+    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE,
+    FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE RESTRICT,
+    INDEX idx_quiz (quiz_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ─── 7. LEARNING SESSIONS ─────────────────────────────────
+CREATE TABLE IF NOT EXISTS learning_sessions (
+    id                  INT AUTO_INCREMENT PRIMARY KEY,
+    user_id             INT NOT NULL,
+    item_id             INT NOT NULL,
+    started_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ended_at            DATETIME DEFAULT NULL,
+    duration_seconds    INT DEFAULT 0,
+    completion_rate     FLOAT DEFAULT 0.0,
+    interaction_score   FLOAT DEFAULT 0.0,
+    status              ENUM('in_progress','completed','abandoned') DEFAULT 'in_progress',
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (item_id) REFERENCES learning_items(id) ON DELETE CASCADE,
+    INDEX idx_user (user_id),
+    INDEX idx_user_item (user_id, item_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ─── 8. FLASHCARD LOGS ────────────────────────────────────
+CREATE TABLE IF NOT EXISTS flashcard_logs (
+    id                  INT AUTO_INCREMENT PRIMARY KEY,
+    user_id             INT NOT NULL,
+    flashcard_id        INT NOT NULL,
+    result              ENUM('correct','incorrect','skipped') NOT NULL,
+    response_time_ms    INT DEFAULT 0,
+    answered_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (flashcard_id) REFERENCES flashcards(id) ON DELETE CASCADE,
+    INDEX idx_user (user_id),
+    INDEX idx_user_flashcard (user_id, flashcard_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ─── 9. QUIZ RESULTS ──────────────────────────────────────
+CREATE TABLE IF NOT EXISTS quiz_results (
+    id                  INT AUTO_INCREMENT PRIMARY KEY,
+    user_id             INT NOT NULL,
+    quiz_id             INT NOT NULL,
+    score               FLOAT NOT NULL DEFAULT 0,
+    total_questions     INT NOT NULL,
+    correct_answers     INT NOT NULL DEFAULT 0,
+    answers             JSON DEFAULT NULL,
+    time_spent_seconds  INT DEFAULT 0,
+    is_passed           BOOLEAN DEFAULT FALSE,
+    taken_at            DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE,
+    INDEX idx_user (user_id),
+    INDEX idx_user_quiz (user_id, quiz_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ─── 10. LEARNING PROFILES ────────────────────────────────
+CREATE TABLE IF NOT EXISTS learning_profiles (
+    user_id                 INT PRIMARY KEY,
+    topic_scores            JSON DEFAULT NULL,
+    difficulty_distribution JSON DEFAULT NULL,
+    preferred_difficulty    ENUM('beginner','intermediate','advanced') DEFAULT 'beginner',
+    profile_vector          JSON DEFAULT NULL,
+    total_study_hours       FLOAT DEFAULT 0.0,
+    total_items_completed   INT DEFAULT 0,
+    total_quizzes_taken     INT DEFAULT 0,
+    avg_quiz_score          FLOAT DEFAULT 0.0,
+    last_updated            DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ─── 11. RECOMMENDATIONS ──────────────────────────────────
+CREATE TABLE IF NOT EXISTS recommendations (
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    user_id         INT NOT NULL,
+    item_id         INT NOT NULL,
+    score           FLOAT NOT NULL DEFAULT 0.0,
+    reason          VARCHAR(500) DEFAULT NULL,
+    rec_type        ENUM('content','path','review') DEFAULT 'content',
+    is_clicked      BOOLEAN DEFAULT FALSE,
+    generated_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+    clicked_at      DATETIME DEFAULT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (item_id) REFERENCES learning_items(id) ON DELETE CASCADE,
+    UNIQUE KEY uq_user_item (user_id, item_id),
+    INDEX idx_user_score (user_id, score DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ─── 12. LEARNING PATHS ───────────────────────────────────
+CREATE TABLE IF NOT EXISTS learning_paths (
+    id                  INT AUTO_INCREMENT PRIMARY KEY,
+    user_id             INT NOT NULL,
+    title               VARCHAR(500) DEFAULT 'Lộ trình học của tôi',
+    item_sequence       JSON DEFAULT NULL,
+    progress_percent    FLOAT DEFAULT 0.0,
+    is_active           BOOLEAN DEFAULT TRUE,
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- ============================================================
 -- SEED DATA - Dữ liệu mẫu cho hệ thống DB Learning
 -- ============================================================
 
@@ -232,3 +433,32 @@ INSERT INTO questions (quiz_id, topic_id, content, options, correct_option, expl
 INSERT INTO users (email, password_hash, full_name, role) VALUES
 ('admin@dblearning.edu.vn', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMaijsWGUxOaT3pS9pWtGXmhIO', 'Quản trị viên', 'admin'),
 ('demo@student.edu.vn', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMaijsWGUxOaT3pS9pWtGXmhIO', 'Sinh viên Demo', 'student');
+
+
+-- Added from missing questions fix --
+﻿SET NAMES utf8mb4;
+
+-- Xóa các câu hỏi bị lỗi font vừa nãy (quiz_id = 8 và quiz_id = 9)
+DELETE FROM questions WHERE quiz_id IN (8, 9);
+
+-- Seed questions for Quiz 8: Chỉ mục & Tối ưu (Topic ID 8)
+INSERT INTO questions (quiz_id, topic_id, content, options, correct_option, explanation, difficulty, order_index) VALUES 
+(8, 8, 'Chỉ mục (Index) trong CSDL là gì?', '["Một bảng ảo", "Một cấu trúc dữ liệu giúp tăng tốc độ truy xuất dữ liệu", "Một loại khóa ngoại", "Một thủ tục lưu trữ"]', 1, 'Index là cấu trúc dữ liệu được sử dụng để nhanh chóng định vị và truy cập dữ liệu.', 'easy', 1),
+(8, 8, 'Loại chỉ mục nào sắp xếp các hàng dữ liệu vật lý trong bảng?', '["Non-clustered index", "Clustered index", "Unique index", "Full-text index"]', 1, 'Clustered index quyết định thứ tự lưu trữ vật lý của các dòng dữ liệu trong bảng.', 'medium', 2),
+(8, 8, 'Nhược điểm của việc tạo quá nhiều chỉ mục là gì?', '["Tăng tốc độ INSERT, UPDATE, DELETE", "Giảm tốc độ SELECT", "Giảm tốc độ INSERT, UPDATE, DELETE", "Làm mất dữ liệu"]', 2, 'Mỗi khi dữ liệu thay đổi, các chỉ mục cũng phải được cập nhật, làm chậm các thao tác ghi dữ liệu.', 'easy', 3),
+(8, 8, 'Lệnh SQL nào dùng để tạo chỉ mục trên một cột?', '["ADD INDEX index_name ON table_name(column_name)", "CREATE INDEX index_name ON table_name(column_name)", "MAKE INDEX index_name FOR table_name(column_name)", "BUILD INDEX index_name ON table_name(column_name)"]', 1, 'Cú pháp chuẩn là CREATE INDEX...', 'easy', 4),
+(8, 8, 'Chỉ mục B-Tree đặc biệt hiệu quả cho loại truy vấn nào?', '["Truy vấn MATCH", "Truy vấn LIKE %abc", "Truy vấn khoảng (Range queries) như BETWEEN, <, >", "Truy vấn nối chuỗi"]', 2, 'Cấu trúc B-Tree giúp tìm kiếm các giá trị trong một khoảng một cách rất nhanh chóng.', 'medium', 5),
+(8, 8, 'Tối ưu hóa truy vấn (Query Optimization) là quá trình gì?', '["Viết lại câu truy vấn bằng ngôn ngữ lập trình", "Chọn kế hoạch thực thi hiệu quả nhất cho câu truy vấn", "Nén dữ liệu để truy vấn chạy nhanh hơn", "Xóa các dữ liệu không cần thiết"]', 1, 'Trình tối ưu hóa của DBMS sẽ phân tích và chọn ra execution plan tối ưu nhất.', 'medium', 6),
+(8, 8, 'Trong kế hoạch thực thi (Execution Plan), phép toán "Table Scan" (hoặc "Full Table Scan") có ý nghĩa gì?', '["Quét toàn bộ dữ liệu trong bảng để tìm kết quả", "Sử dụng chỉ mục để quét bảng", "Quét các bảng có liên quan bằng JOIN", "Không quét bảng nào cả"]', 0, 'Full Table Scan là thao tác quét toàn bộ dữ liệu từ dòng đầu đến cuối, thường rất chậm đối với bảng lớn.', 'easy', 7),
+(8, 8, 'Kỹ thuật nào sau đây KHÔNG phải là một cách tốt để tối ưu hóa truy vấn?', '["Tránh sử dụng SELECT *", "Sử dụng chỉ mục trên các cột thường dùng trong WHERE", "Thay thế JOIN bằng nhiều truy vấn con lồng nhau", "Sử dụng LIMIT khi chỉ cần một số lượng dòng nhất định"]', 2, 'Truy vấn con lồng nhau thường chậm hơn so với việc sử dụng JOIN phù hợp.', 'medium', 8);
+
+-- Seed questions for Quiz 9: NoSQL (Topic ID 9)
+INSERT INTO questions (quiz_id, topic_id, content, options, correct_option, explanation, difficulty, order_index) VALUES 
+(9, 9, 'NoSQL là viết tắt của từ gì?', '["No SQL", "Not Only SQL", "Non-Relational SQL", "None Of SQL"]', 1, 'NoSQL thường được hiểu là Not Only SQL, ngụ ý rằng hệ thống có thể kết hợp cả các tính năng của CSDL quan hệ và phi quan hệ.', 'easy', 1),
+(9, 9, 'Đặc điểm nào sau đây KHÔNG phải của CSDL NoSQL?', '["Linh hoạt về Schema (Schema-less)", "Khả năng mở rộng ngang (Horizontal scaling) tốt", "Đảm bảo tính ACID nghiêm ngặt cho mọi giao dịch", "Thường tối ưu cho dữ liệu lớn và phân tán"]', 2, 'Đa số NoSQL hy sinh tính ACID nghiêm ngặt (ưu tiên BASE) để đổi lấy hiệu suất và khả năng mở rộng ngang.', 'medium', 2),
+(9, 9, 'MongoDB thuộc loại CSDL NoSQL nào?', '["Key-Value", "Document-oriented", "Column-family", "Graph"]', 1, 'MongoDB lưu trữ dữ liệu dưới dạng tài liệu (document) tương tự JSON (BSON).', 'easy', 3),
+(9, 9, 'Redis thuộc loại CSDL NoSQL nào?', '["Key-Value", "Document-oriented", "Column-family", "Graph"]', 0, 'Redis là một CSDL lưu trữ cấu trúc dữ liệu trong bộ nhớ (in-memory) dưới dạng Key-Value.', 'easy', 4),
+(9, 9, 'Neo4j thuộc loại CSDL NoSQL nào?', '["Key-Value", "Document-oriented", "Column-family", "Graph"]', 3, 'Neo4j là một CSDL đồ thị (Graph Database) chuyên dùng để biểu diễn các mối quan hệ phức tạp.', 'easy', 5),
+(9, 9, 'Trong MongoDB, một bản ghi dữ liệu được gọi là gì?', '["Row", "Tuple", "Document", "Collection"]', 2, 'Tương đương với một hàng (row) trong RDBMS là một Document trong MongoDB.', 'easy', 6),
+(9, 9, 'Trong MongoDB, tương đương của khái niệm "Bảng" (Table) trong RDBMS là gì?', '["Database", "Collection", "Document", "Field"]', 1, 'Một Collection chứa các Documents, giống như một Table chứa các Rows.', 'easy', 7),
+(9, 9, 'Định lý CAP phát biểu rằng một hệ thống phân tán chỉ có thể đảm bảo đồng thời tối đa mấy yếu tố?', '["1", "2", "3", "4"]', 1, 'Định lý CAP (Consistency, Availability, Partition tolerance) chỉ ra rằng một hệ thống phân tán chỉ có thể đáp ứng đồng thời 2 trong 3 yếu tố.', 'hard', 8);

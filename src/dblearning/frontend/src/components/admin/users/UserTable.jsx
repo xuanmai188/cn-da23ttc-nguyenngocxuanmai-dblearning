@@ -1,4 +1,4 @@
-import { PencilSquareIcon, EyeIcon, EllipsisHorizontalIcon } from '@heroicons/react/24/outline';
+import { PencilSquareIcon, EyeIcon, LockClosedIcon, LockOpenIcon } from '@heroicons/react/24/outline';
 
 export default function UserTable({ users, loading, page, limit, total, setPage, setLimit, onAction }) {
   const totalPages = Math.ceil(total / limit);
@@ -41,7 +41,7 @@ export default function UserTable({ users, loading, page, limit, total, setPage,
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 flex-shrink-0 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold text-sm">
-                        {u.full_name.charAt(0)}
+                        {(u.full_name || '').split(' ').pop().charAt(0).toUpperCase()}
                       </div>
                       <div>
                         <div className="font-semibold text-slate-900">{u.full_name}</div>
@@ -78,8 +78,16 @@ export default function UserTable({ users, loading, page, limit, total, setPage,
                       <button onClick={() => onAction('view', u)} className="p-1.5 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors" title="Xem chi tiết">
                         <EyeIcon className="w-4 h-4" />
                       </button>
-                      <button onClick={() => onAction('more', u)} className="p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors" title="Thêm thao tác">
-                        <EllipsisHorizontalIcon className="w-4 h-4" />
+                      <button 
+                        onClick={() => onAction('toggle_active', u)} 
+                        className={`p-1.5 rounded-lg transition-colors ${
+                          u.is_active 
+                            ? 'text-slate-400 hover:text-orange-600 hover:bg-orange-50' 
+                            : 'text-orange-500 hover:text-green-600 hover:bg-green-50'
+                        }`} 
+                        title={u.is_active ? "Khóa tài khoản" : "Mở khóa tài khoản"}
+                      >
+                        {u.is_active ? <LockClosedIcon className="w-4 h-4" /> : <LockOpenIcon className="w-4 h-4" />}
                       </button>
                     </div>
                   </td>

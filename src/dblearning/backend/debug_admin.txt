@@ -1,0 +1,51 @@
+ilter(LearningItem.created_at >= sixty_days_ago, LearningItem.created_at < thirty_days_ago).count()
+    item_growth_rate = items_last_30
+    
+    # Card 3: Quizzes
+    total_quizzes = db.query(Quiz).count()
+    total_questions = db.query(Question).count()
+    
+    quizzes_last_30 = db.query(Quiz).filter(Quiz.created_at >= thirty_days_ago).count()
+    quizzes_prev_30 = db.query(Quiz).filter(Quiz.created_at >= sixty_days_ago, Quiz.created_at < thirty_days_ago).count()
+    quiz_growth_rate = quizzes_last_30
+    
+    # Card 4: Sessions Today vs Yesterday
+    today = datetime.utcnow().date()
+    yesterday = today - timedelta(days=1)
+    
+    today_sessions = db.query(LearningSession).filter(
+        func.date(LearningSession.started_at) == today
+    ).count()
+    
+    yesterday_sessions = db.query(LearningSession).filter(
+        func.date(LearningSession.started_at) == yesterday
+    ).count()
+    
+    session_growth_rate = today_sessions - yesterday_sessions
+
+    return {
+        "total_users": total_users,
+        "total_students": total_students,
+        "total_admins": total_admins,
+        "user_growth_rate": round(user_growth_rate, 1),
+        "total_learning_items": total_learning_items,
+        "total_topics": total_topics,
+        "item_growth_rate": round(item_growth_rate, 1),
+        "total_quizzes": total_quizzes,
+        "total_questions": total_questions,
+        "quiz_growth_rate": round(quiz_growth_rate, 1),
+        "today_sessions": today_sessions,
+        "yesterday_sessions": yesterday_sessions,
+        "session_growth_rate": round(session_growth_rate, 1)
+    }
+
+@router.get("/charts/topic-learning", response_model=List[TopicLearningStat])
+def get_topic_learning_stats(
+    db: Session = Depends(deps.get_db),
+    current_admin: User = Depends(deps.get_current_active_admin)
+) -> Any:
+    results = db.query(
+        Topic.name,
+        Topic.color,
+        func.count(LearningSession.id).label('sessions')
+    ).join(LearningItem, LearningItem.topic_id == To

@@ -12,6 +12,7 @@ from app.schemas.admin import (
     UserStats, UserDetailResponse, UserHistoryResponse
 )
 from typing import List
+from app.schemas.user import UserCreate, UserUpdate
 
 router = APIRouter()
 
@@ -30,7 +31,7 @@ def get_dashboard_stats(
     
     users_last_30 = db.query(User).filter(User.created_at >= thirty_days_ago).count()
     users_prev_30 = db.query(User).filter(User.created_at >= sixty_days_ago, User.created_at < thirty_days_ago).count()
-    user_growth_rate = ((users_last_30 - users_prev_30) / users_prev_30 * 100) if users_prev_30 > 0 else (100.0 if users_last_30 > 0 else 0.0)
+    user_growth_rate = users_last_30
     
     # Card 2: Content
     total_learning_items = db.query(LearningItem).count()
@@ -38,7 +39,7 @@ def get_dashboard_stats(
     
     items_last_30 = db.query(LearningItem).filter(LearningItem.created_at >= thirty_days_ago).count()
     items_prev_30 = db.query(LearningItem).filter(LearningItem.created_at >= sixty_days_ago, LearningItem.created_at < thirty_days_ago).count()
-    item_growth_rate = ((items_last_30 - items_prev_30) / items_prev_30 * 100) if items_prev_30 > 0 else (100.0 if items_last_30 > 0 else 0.0)
+    item_growth_rate = items_last_30
     
     # Card 3: Quizzes
     total_quizzes = db.query(Quiz).count()
@@ -46,7 +47,7 @@ def get_dashboard_stats(
     
     quizzes_last_30 = db.query(Quiz).filter(Quiz.created_at >= thirty_days_ago).count()
     quizzes_prev_30 = db.query(Quiz).filter(Quiz.created_at >= sixty_days_ago, Quiz.created_at < thirty_days_ago).count()
-    quiz_growth_rate = ((quizzes_last_30 - quizzes_prev_30) / quizzes_prev_30 * 100) if quizzes_prev_30 > 0 else (100.0 if quizzes_last_30 > 0 else 0.0)
+    quiz_growth_rate = quizzes_last_30
     
     # Card 4: Sessions Today vs Yesterday
     today = datetime.utcnow().date()
@@ -60,11 +61,7 @@ def get_dashboard_stats(
         func.date(LearningSession.started_at) == yesterday
     ).count()
     
-    session_growth_rate = 0.0
-    if yesterday_sessions > 0:
-        session_growth_rate = ((today_sessions - yesterday_sessions) / yesterday_sessions) * 100
-    elif today_sessions > 0:
-        session_growth_rate = 100.0
+    session_growth_rate = today_sessions - yesterday_sessions
 
     return {
         "total_users": total_users,
@@ -180,6 +177,7 @@ def get_popular_lessons(
 
 @router.get("/recent-activities", response_model=List[RecentActivity])
 def get_recent_activities(
+    limit: int = 5,
     db: Session = Depends(deps.get_db),
     current_admin: User = Depends(deps.get_current_active_admin)
 ) -> Any:
@@ -193,7 +191,7 @@ def get_recent_activities(
     ).join(User, LearningSession.user_id == User.id) \
      .join(LearningItem, LearningSession.item_id == LearningItem.id) \
      .order_by(desc(LearningSession.started_at)) \
-     .limit(5).all()
+     .limit(limit).all()
      
     activities = []
     for s in recent_sessions:
@@ -203,7 +201,7 @@ def get_recent_activities(
         # Simple time ago string (mocked to minutes for UI demo)
         delta = datetime.utcnow() - s.started_at
         mins_ago = int(delta.total_seconds() / 60)
-        time_str = f"{mins_ago} phút trước" if mins_ago < 60 else f"{mins_ago // 60} giờ trước"
+        time_str = f"{mins_ago} phút trước" if mins_ago < 60 else (f"{mins_ago // 60} giờ trước" if mins_ago < 1440 else f"{mins_ago // 1440} ngày trước")
         
         activities.append({
             "id": s.id,
@@ -229,7 +227,7 @@ def get_user_stats(
     sixty_days_ago = datetime.utcnow() - timedelta(days=60)
     users_last_30 = db.query(User).filter(User.created_at >= thirty_days_ago).count()
     users_prev_30 = db.query(User).filter(User.created_at >= sixty_days_ago, User.created_at < thirty_days_ago).count()
-    growth_rate = ((users_last_30 - users_prev_30) / users_prev_30 * 100) if users_prev_30 > 0 else (100.0 if users_last_30 > 0 else 0.0)
+    growth_rate = users_last_30
     
     return {
         "total": total,
@@ -303,6 +301,8 @@ def get_users(
             "id": u.id,
             "email": u.email,
             "full_name": u.full_name,
+            "phone_number": u.phone_number,
+            "contact_email": u.contact_email,
             "role": u.role,
             "is_active": u.is_active,
             "created_at": u.created_at,
@@ -499,6 +499,7 @@ def get_user_details(
         "email": user.email,
         "full_name": user.full_name,
         "phone_number": user.phone_number,
+        "contact_email": user.contact_email,
         "role": user.role,
         "is_active": user.is_active,
         "created_at": user.created_at,
@@ -554,18 +555,6 @@ from pydantic import BaseModel
 from typing import Optional
 from app.core.security import get_password_hash
 
-class UserCreate(BaseModel):
-    email: str
-    password: str
-    full_name: str
-    phone_number: Optional[str] = None
-    role: str = "student"
-
-class UserUpdate(BaseModel):
-    full_name: str
-    phone_number: Optional[str] = None
-    role: str
-
 @router.post("/users")
 def create_user(
     user_in: UserCreate,
@@ -581,6 +570,7 @@ def create_user(
         password_hash=get_password_hash(user_in.password),
         full_name=user_in.full_name,
         phone_number=user_in.phone_number,
+        contact_email=user_in.contact_email,
         role=user_in.role,
         is_active=True
     )
@@ -599,9 +589,10 @@ def update_user(
     if not user:
         raise HTTPException(status_code=404, detail="Không tìm thấy")
         
-    user.full_name = user_in.full_name
-    user.phone_number = user_in.phone_number
-    user.role = user_in.role
+    update_data = user_in.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(user, field, value)
+        
     db.commit()
     return {"message": "Cập nhật thành công"}
 
@@ -618,3 +609,606 @@ def reset_user_password(
     user.password_hash = get_password_hash("123456")
     db.commit()
     return {"message": "Mật khẩu đã được đặt lại thành 123456"}
+
+
+from app.models.models import Notification
+
+@router.get("/notifications")
+def get_notifications(
+    db: Session = Depends(deps.get_db),
+    current_admin: User = Depends(deps.get_current_active_admin)
+) -> Any:
+    notifications = db.query(Notification).filter(
+        Notification.user_id == current_admin.id
+    ).order_by(desc(Notification.created_at)).limit(20).all()
+    
+    unread_count = db.query(Notification).filter(
+        Notification.user_id == current_admin.id,
+        Notification.is_read == False
+    ).count()
+    
+    return {
+        "notifications": notifications,
+        "unread_count": unread_count
+    }
+
+@router.put("/notifications/read-all")
+def mark_all_notifications_read(
+    db: Session = Depends(deps.get_db),
+    current_admin: User = Depends(deps.get_current_active_admin)
+) -> Any:
+    db.query(Notification).filter(
+        Notification.user_id == current_admin.id,
+        Notification.is_read == False
+    ).update({"is_read": True})
+    db.commit()
+    return {"message": "Đã đánh dấu đọc tất cả"}
+
+@router.put("/notifications/{notif_id}/read")
+def mark_notification_read(
+    notif_id: int,
+    db: Session = Depends(deps.get_db),
+    current_admin: User = Depends(deps.get_current_active_admin)
+) -> Any:
+    notif = db.query(Notification).filter(
+        Notification.id == notif_id,
+        Notification.user_id == current_admin.id
+    ).first()
+    if notif:
+        notif.is_read = True
+        db.commit()
+    return {"message": "OK"}
+
+# ==========================================
+# LESSONS (ITEMS) MANAGEMENT
+# ==========================================
+from app.schemas.learning import LearningItem as LearningItemSchema, LearningItemCreate, LearningItemUpdate
+from app.models.models import LearningItem as LearningItemModel
+
+@router.get("/items", response_model=List[LearningItemSchema])
+def get_items(
+    db: Session = Depends(deps.get_db),
+    skip: int = 0,
+    limit: int = 100,
+    topic_id: Optional[int] = None,
+    current_admin: User = Depends(deps.get_current_active_admin)
+) -> Any:
+    query = db.query(LearningItemModel)
+    if topic_id:
+        query = query.filter(LearningItemModel.topic_id == topic_id)
+    return query.offset(skip).limit(limit).all()
+
+@router.post("/items", response_model=LearningItemSchema)
+def create_item(
+    *,
+    db: Session = Depends(deps.get_db),
+    item_in: LearningItemCreate,
+    current_admin: User = Depends(deps.get_current_active_admin)
+) -> Any:
+    item = LearningItemModel(**item_in.dict())
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+@router.put("/items/{item_id}", response_model=LearningItemSchema)
+def update_item(
+    *,
+    db: Session = Depends(deps.get_db),
+    item_id: int,
+    item_in: LearningItemUpdate,
+    current_admin: User = Depends(deps.get_current_active_admin)
+) -> Any:
+    item = db.query(LearningItemModel).filter(LearningItemModel.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Bài học không tồn tại")
+    
+    update_data = item_in.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(item, field, value)
+        
+    db.commit()
+    db.refresh(item)
+    return item
+
+@router.delete("/items/{item_id}")
+def delete_item(
+    *,
+    db: Session = Depends(deps.get_db),
+    item_id: int,
+    current_admin: User = Depends(deps.get_current_active_admin)
+) -> Any:
+    item = db.query(LearningItemModel).filter(LearningItemModel.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Bài học không tồn tại")
+    
+    db.delete(item)
+    db.commit()
+    return {"message": "Đã xóa bài học"}
+
+# ==========================================
+# QUIZ MANAGEMENT
+# ==========================================
+from app.schemas.quiz import Quiz as QuizSchema, QuizCreate, QuizUpdate
+from app.models.models import Quiz as QuizModel
+
+@router.get("/quizzes", response_model=List[QuizSchema])
+def get_quizzes(
+    db: Session = Depends(deps.get_db),
+    skip: int = 0,
+    limit: int = 100,
+    item_id: Optional[int] = None,
+    current_admin: User = Depends(deps.get_current_active_admin)
+) -> Any:
+    query = db.query(QuizModel)
+    if item_id:
+        query = query.filter(QuizModel.item_id == item_id)
+    return query.offset(skip).limit(limit).all()
+
+@router.post("/quizzes", response_model=QuizSchema)
+def create_quiz(
+    *,
+    db: Session = Depends(deps.get_db),
+    quiz_in: QuizCreate,
+    current_admin: User = Depends(deps.get_current_active_admin)
+) -> Any:
+    quiz = QuizModel(**quiz_in.dict())
+    db.add(quiz)
+    db.commit()
+    db.refresh(quiz)
+    return quiz
+
+@router.put("/quizzes/{quiz_id}", response_model=QuizSchema)
+def update_quiz(
+    *,
+    db: Session = Depends(deps.get_db),
+    quiz_id: int,
+    quiz_in: QuizUpdate,
+    current_admin: User = Depends(deps.get_current_active_admin)
+) -> Any:
+    quiz = db.query(QuizModel).filter(QuizModel.id == quiz_id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz không tồn tại")
+    
+    update_data = quiz_in.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(quiz, field, value)
+        
+    db.commit()
+    db.refresh(quiz)
+    return quiz
+
+@router.delete("/quizzes/{quiz_id}")
+def delete_quiz(
+    *,
+    db: Session = Depends(deps.get_db),
+    quiz_id: int,
+    current_admin: User = Depends(deps.get_current_active_admin)
+) -> Any:
+    quiz = db.query(QuizModel).filter(QuizModel.id == quiz_id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz không tồn tại")
+    
+    db.delete(quiz)
+    db.commit()
+    return {"message": "Đã xóa quiz"}
+
+# --- Questions Management ---
+from app.models.models import Question as QuestionModel
+from app.schemas.quiz import Question as QuestionSchema, QuestionCreate, QuestionUpdate
+
+@router.get("/quizzes/{quiz_id}/questions", response_model=List[QuestionSchema])
+def get_questions_by_quiz(
+    quiz_id: int,
+    db: Session = Depends(deps.get_db),
+    current_admin: User = Depends(deps.get_current_active_admin)
+) -> Any:
+    questions = db.query(QuestionModel).filter(QuestionModel.quiz_id == quiz_id).order_by(QuestionModel.order_index).all()
+    return questions
+
+@router.post("/quizzes/{quiz_id}/questions", response_model=QuestionSchema)
+def create_question(
+    quiz_id: int,
+    question_in: QuestionCreate,
+    db: Session = Depends(deps.get_db),
+    current_admin: User = Depends(deps.get_current_active_admin)
+) -> Any:
+    quiz = db.query(QuizModel).filter(QuizModel.id == quiz_id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+    
+    question_data = question_in.dict()
+    question_data["quiz_id"] = quiz_id
+    question_data["topic_id"] = quiz.item.topic_id
+    
+    question = QuestionModel(**question_data)
+    db.add(question)
+    quiz.total_questions += 1
+    db.commit()
+    db.refresh(question)
+    return question
+
+@router.put("/questions/{question_id}", response_model=QuestionSchema)
+def update_question(
+    question_id: int,
+    question_in: QuestionUpdate,
+    db: Session = Depends(deps.get_db),
+    current_admin: User = Depends(deps.get_current_active_admin)
+) -> Any:
+    question = db.query(QuestionModel).filter(QuestionModel.id == question_id).first()
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+        
+    update_data = question_in.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(question, field, value)
+        
+    db.commit()
+    db.refresh(question)
+    return question
+
+@router.delete("/questions/{question_id}")
+def delete_question(
+    question_id: int,
+    db: Session = Depends(deps.get_db),
+    current_admin: User = Depends(deps.get_current_active_admin)
+) -> Any:
+    question = db.query(QuestionModel).filter(QuestionModel.id == question_id).first()
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+        
+    quiz = db.query(QuizModel).filter(QuizModel.id == question.quiz_id).first()
+    if quiz:
+        quiz.total_questions = max(0, quiz.total_questions - 1)
+        
+    db.delete(question)
+    db.commit()
+    return {"message": "Question deleted successfully"}
+
+# --- Flashcards Management ---
+from app.models.models import Flashcard as FlashcardModel
+from app.schemas.quiz import Flashcard as FlashcardSchema, FlashcardCreate, FlashcardUpdate
+
+@router.get("/items/{item_id}/flashcards", response_model=List[FlashcardSchema])
+def get_flashcards_by_item(
+    item_id: int,
+    db: Session = Depends(deps.get_db),
+    current_admin: User = Depends(deps.get_current_active_admin)
+) -> Any:
+    flashcards = db.query(FlashcardModel).filter(FlashcardModel.item_id == item_id).order_by(FlashcardModel.order_index).all()
+    return flashcards
+
+@router.post("/items/{item_id}/flashcards", response_model=FlashcardSchema)
+def create_flashcard(
+    item_id: int,
+    flashcard_in: FlashcardCreate,
+    db: Session = Depends(deps.get_db),
+    current_admin: User = Depends(deps.get_current_active_admin)
+) -> Any:
+    item = db.query(LearningItemModel).filter(LearningItemModel.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Learning Item not found")
+    
+    flashcard_data = flashcard_in.dict()
+    flashcard_data["item_id"] = item_id
+    
+    flashcard = FlashcardModel(**flashcard_data)
+    db.add(flashcard)
+    db.commit()
+    db.refresh(flashcard)
+    return flashcard
+
+@router.put("/flashcards/{flashcard_id}", response_model=FlashcardSchema)
+def update_flashcard(
+    flashcard_id: int,
+    flashcard_in: FlashcardUpdate,
+    db: Session = Depends(deps.get_db),
+    current_admin: User = Depends(deps.get_current_active_admin)
+) -> Any:
+    flashcard = db.query(FlashcardModel).filter(FlashcardModel.id == flashcard_id).first()
+    if not flashcard:
+        raise HTTPException(status_code=404, detail="Flashcard not found")
+        
+    update_data = flashcard_in.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(flashcard, field, value)
+        
+    db.commit()
+    db.refresh(flashcard)
+    return flashcard
+
+@router.delete("/flashcards/{flashcard_id}")
+def delete_flashcard(
+    flashcard_id: int,
+    db: Session = Depends(deps.get_db),
+    current_admin: User = Depends(deps.get_current_active_admin)
+) -> Any:
+    flashcard = db.query(FlashcardModel).filter(FlashcardModel.id == flashcard_id).first()
+    if not flashcard:
+        raise HTTPException(status_code=404, detail="Flashcard not found")
+        
+    db.delete(flashcard)
+    db.commit()
+    return {"message": "Flashcard deleted successfully"}
+
+# --- Full Statistics ---
+@router.get("/statistics/full")
+def get_full_statistics(
+    db: Session = Depends(deps.get_db),
+    current_admin: User = Depends(deps.get_current_active_admin)
+) -> Any:
+    now = datetime.utcnow()
+    seven_days_ago = now - timedelta(days=7)
+    
+    # 1. Overview KPIs
+    total_users = db.query(User).count()
+    
+    # Active users: Has a learning session in the last 7 days
+    active_users = db.query(LearningSession.user_id).filter(LearningSession.started_at >= seven_days_ago).distinct().count()
+    
+    total_items = db.query(LearningItemModel).count()
+    
+    avg_quiz_score = db.query(func.avg(QuizResult.score)).scalar() or 0.0
+    
+    # 2. User Structure
+    students = db.query(User).filter(User.role == "student").count()
+    admins = db.query(User).filter(User.role == "admin").count()
+    blocked = db.query(User).filter(User.is_active == False).count()
+    
+    # 3. Performance Stats
+    total_sessions = db.query(LearningSession).count()
+    completed_sessions = db.query(LearningSession).filter(LearningSession.status == "completed").count()
+    completion_rate = (completed_sessions / total_sessions * 100) if total_sessions > 0 else 0.0
+    
+    quiz_sessions = db.query(LearningSession).join(LearningItemModel).filter(LearningItemModel.content_type == 'quiz').count()
+    doc_sessions = db.query(LearningSession).join(LearningItemModel).filter(LearningItemModel.content_type == 'document').count()
+    
+    quiz_attempt_rate = (quiz_sessions / total_sessions * 100) if total_sessions > 0 else 0.0
+    document_view_rate = (doc_sessions / total_sessions * 100) if total_sessions > 0 else 0.0
+    
+    # 4. Content Distribution
+    docs = db.query(LearningItemModel).filter(LearningItemModel.content_type == 'document').count()
+    videos = db.query(LearningItemModel).filter(LearningItemModel.content_type == 'video').count()
+    quizzes = db.query(LearningItemModel).filter(LearningItemModel.content_type == 'quiz').count()
+    flashcards = db.query(LearningItemModel).filter(LearningItemModel.content_type == 'flashcard_set').count()
+    
+    # 5. Recommendation Effectiveness
+    # (Assuming Recommendation model is imported, it should be if models.py is imported as a whole)
+    from app.models.models import Recommendation
+    total_recs = db.query(Recommendation).count()
+    clicked_recs = db.query(Recommendation).filter(Recommendation.is_clicked == True).count()
+    click_rate = (clicked_recs / total_recs * 100) if total_recs > 0 else 0.0
+    
+    # Completed recommended items
+    # Join Recommendation with LearningSession on user_id and item_id
+    completed_recs = db.query(Recommendation).join(
+        LearningSession, 
+        (Recommendation.user_id == LearningSession.user_id) & (Recommendation.item_id == LearningSession.item_id)
+    ).filter(
+        Recommendation.is_clicked == True,
+        LearningSession.status == "completed"
+    ).count()
+    
+    completion_rate_recs = (completed_recs / clicked_recs * 100) if clicked_recs > 0 else 0.0
+    
+    return {
+        "overview": {
+            "total_users": total_users,
+            "active_users": active_users,
+            "total_items": total_items,
+            "avg_quiz_score": round(avg_quiz_score, 1)
+        },
+        "users": {
+            "students": students,
+            "admins": admins,
+            "blocked": blocked
+        },
+        "performance": {
+            "completion_rate": round(completion_rate, 1),
+            "avg_quiz_score": round(avg_quiz_score, 1),
+            "quiz_attempt_rate": round(quiz_attempt_rate, 1),
+            "document_view_rate": round(document_view_rate, 1)
+        },
+        "content_distribution": {
+            "document": docs,
+            "video": videos,
+            "quiz": quizzes,
+            "flashcard_set": flashcards
+        },
+        "recommendations": {
+            "total": total_recs,
+            "clicked": clicked_recs,
+            "click_rate": round(click_rate, 1),
+            "completed": completed_recs,
+            "completion_rate": round(completion_rate_recs, 1)
+        }
+    }
+
+
+# --- SURVEY MANAGEMENT ---
+
+from app.models.models import Survey, SurveyQuestion, SurveyOption
+from app.schemas.survey import SurveyCreate, SurveyUpdate, SurveyResponse, SurveyQuestionCreate, SurveyQuestionUpdate, SurveyQuestionResponse
+
+
+@router.get("/surveys/stats/overview")
+def get_survey_stats(
+    db: Session = Depends(deps.get_db),
+    current_admin: User = Depends(deps.get_current_active_admin)
+):
+    from app.models.models import SurveyAttempt, User
+    completed = db.query(SurveyAttempt).filter(SurveyAttempt.status == "completed").count()
+    total_users = db.query(User).filter(User.role == "student").count()
+    return {"total_completed": completed, "total_users": total_users}
+
+@router.get("/surveys", response_model=List[SurveyResponse])
+def get_surveys(
+    db: Session = Depends(deps.get_db),
+    current_admin: User = Depends(deps.get_current_active_admin)
+):
+    return db.query(Survey).order_by(Survey.id.desc()).all()
+
+@router.post("/surveys", response_model=SurveyResponse)
+def create_survey(
+    *,
+    db: Session = Depends(deps.get_db),
+    survey_in: SurveyCreate,
+    current_admin: User = Depends(deps.get_current_active_admin)
+):
+    survey = Survey(**survey_in.dict())
+    db.add(survey)
+    db.commit()
+    db.refresh(survey)
+    return survey
+
+@router.put("/surveys/{survey_id}", response_model=SurveyResponse)
+def update_survey(
+    *,
+    db: Session = Depends(deps.get_db),
+    survey_id: int,
+    survey_in: SurveyUpdate,
+    current_admin: User = Depends(deps.get_current_active_admin)
+):
+    survey = db.query(Survey).filter(Survey.id == survey_id).first()
+    if not survey:
+        raise HTTPException(status_code=404, detail="Survey not found")
+    
+    update_data = survey_in.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(survey, field, value)
+        
+    db.commit()
+    db.refresh(survey)
+    return survey
+
+@router.delete("/surveys/{survey_id}")
+def delete_survey(
+    *,
+    db: Session = Depends(deps.get_db),
+    survey_id: int,
+    current_admin: User = Depends(deps.get_current_active_admin)
+):
+    survey = db.query(Survey).filter(Survey.id == survey_id).first()
+    if not survey:
+        raise HTTPException(status_code=404, detail="Survey not found")
+    db.delete(survey)
+    db.commit()
+    return {"ok": True}
+
+@router.post("/surveys/{survey_id}/activate")
+def activate_survey(
+    *,
+    db: Session = Depends(deps.get_db),
+    survey_id: int,
+    current_admin: User = Depends(deps.get_current_active_admin)
+):
+    # Deactivate all other surveys
+    db.query(Survey).update({"is_active": False})
+    
+    # Activate the target one
+    survey = db.query(Survey).filter(Survey.id == survey_id).first()
+    if not survey:
+        raise HTTPException(status_code=404, detail="Survey not found")
+    survey.is_active = True
+    survey.status = "published"
+    db.commit()
+    return {"ok": True}
+
+# --- SURVEY QUESTIONS ---
+
+@router.get("/surveys/{survey_id}/questions", response_model=List[SurveyQuestionResponse])
+def get_survey_questions(
+    *,
+    db: Session = Depends(deps.get_db),
+    survey_id: int,
+    current_admin: User = Depends(deps.get_current_active_admin)
+):
+    return db.query(SurveyQuestion).filter(SurveyQuestion.survey_id == survey_id).order_by(SurveyQuestion.order_index.asc()).all()
+
+@router.post("/surveys/{survey_id}/questions", response_model=SurveyQuestionResponse)
+def create_survey_question(
+    *,
+    db: Session = Depends(deps.get_db),
+    survey_id: int,
+    question_in: SurveyQuestionCreate,
+    current_admin: User = Depends(deps.get_current_active_admin)
+):
+    survey = db.query(Survey).filter(Survey.id == survey_id).first()
+    if not survey:
+        raise HTTPException(status_code=404, detail="Survey not found")
+        
+    question_data = question_in.dict(exclude={"options"})
+    question = SurveyQuestion(**question_data, survey_id=survey_id)
+    db.add(question)
+    db.commit()
+    db.refresh(question)
+    
+    # Add options
+    for opt_data in question_in.options:
+        opt = SurveyOption(**opt_data.dict(), question_id=question.id)
+        db.add(opt)
+    
+    db.commit()
+    db.refresh(question)
+    return question
+
+@router.delete("/questions/{question_id}")
+def delete_survey_question(
+    *,
+    db: Session = Depends(deps.get_db),
+    question_id: int,
+    current_admin: User = Depends(deps.get_current_active_admin)
+):
+    question = db.query(SurveyQuestion).filter(SurveyQuestion.id == question_id).first()
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+    db.delete(question)
+    db.commit()
+    return {"ok": True}
+
+
+
+@router.get("/surveys/active/results")
+def get_survey_results(
+    db: Session = Depends(deps.get_db),
+    current_admin: User = Depends(deps.get_current_active_admin)
+):
+    from app.models.models import Survey, SurveyAttempt, SurveyAnswer, SurveyQuestion, SurveyOption
+    
+    survey = db.query(Survey).filter(Survey.is_active == True).first()
+    if not survey:
+        return []
+        
+    attempts = db.query(SurveyAttempt).filter(SurveyAttempt.survey_id == survey.id, SurveyAttempt.status == "completed").all()
+    
+    results = []
+    for att in attempts:
+        user = db.query(User).filter(User.id == att.user_id).first()
+        answers = db.query(SurveyAnswer).filter(SurveyAnswer.attempt_id == att.id).all()
+        
+        ans_details = []
+        for a in answers:
+            q = db.query(SurveyQuestion).filter(SurveyQuestion.id == a.question_id).first()
+            if not q: continue
+            
+            val = a.text_value
+            if a.option_id:
+                opt = db.query(SurveyOption).filter(SurveyOption.id == a.option_id).first()
+                if opt:
+                    val = opt.content
+                    
+            ans_details.append({
+                "question": q.content,
+                "answer": val
+            })
+            
+        results.append({
+            "id": att.id,
+            "user_name": user.full_name if user else "Unknown",
+            "email": user.email if user else "Unknown",
+            "completed_at": att.completed_at,
+            "total_score": att.total_score,
+            "answers": ans_details
+        })
+        
+    return results

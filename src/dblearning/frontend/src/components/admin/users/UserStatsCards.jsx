@@ -60,10 +60,10 @@ export default function UserStatsCards({ stats }) {
             <p className="text-sm font-medium text-slate-500 mb-1">{card.title}</p>
             <div className="flex items-end gap-2">
               <span className="text-2xl font-bold text-slate-900 leading-none">{card.value}</span>
-              {card.increase !== null && (
-                <span className={`flex items-center text-sm font-semibold mb-0.5 ${card.increase >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                  {card.increase >= 0 ? <ArrowTrendingUpIcon className="w-4 h-4 mr-0.5" /> : <ArrowTrendingDownIcon className="w-4 h-4 mr-0.5" />}
-                  {Math.abs(card.increase)}%
+              {card.increase !== null && card.increase > 0 && (
+                <span className={`flex items-center text-sm font-semibold mb-0.5 text-green-600`}>
+                  <ArrowTrendingUpIcon className="w-4 h-4 mr-0.5" />
+                  +{card.increase} mới
                 </span>
               )}
             </div>

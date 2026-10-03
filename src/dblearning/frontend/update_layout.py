@@ -1,22 +1,34 @@
-﻿file_path = "D:/DemoCN2026/dblearning/frontend/src/components/Layout.jsx"
+﻿file_path = "D:/DemoCN2026/dblearning/frontend/src/components/admin/users/UserDetailPanel.jsx"
 with open(file_path, "r", encoding="utf-8") as f:
     content = f.read()
 
-# Add Admin Panel to the navigation
-nav_item = """  const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: ChartBarIcon },
-    { name: 'Chủ đề', href: '/topics', icon: BookOpenIcon },
-    { name: 'Lộ trình của tôi', href: '/my-path', icon: MapIcon },
-    { name: 'Cài đặt', href: '/settings', icon: Cog6ToothIcon },
-  ];
-  
-  if (user?.role === 'admin') {
-    navigation.push({ name: 'Quản trị (Admin)', href: '/admin/dashboard', icon: ChartBarIcon });
-  }
-"""
+# Change layout to grid
+content = content.replace(
+    '<div className="space-y-4">',
+    '<div className="grid grid-cols-2 gap-y-6 gap-x-4">'
+)
 
-content = content.replace("  const navigation = [\n    { name: 'Dashboard', href: '/dashboard', icon: ChartBarIcon },\n    { name: 'Chủ đề', href: '/topics', icon: BookOpenIcon },\n    { name: 'Lộ trình của tôi', href: '/my-path', icon: MapIcon },\n    { name: 'Cài đặt', href: '/settings', icon: Cog6ToothIcon },\n  ];", nav_item)
+# Fix phone number rendering
+old_phone = """                    {details?.phone_number && (
+                      <div className="flex items-center gap-3">
+                        <PhoneIcon className="w-5 h-5 text-slate-400" />
+                        <div className="flex-1">
+                          <p className="text-xs text-slate-500 font-medium">Số điện thoại</p>
+                          <p className="text-sm font-medium text-slate-900">{details?.phone_number}</p>
+                        </div>
+                      </div>
+                    )}"""
+
+new_phone = """                    <div className="flex items-center gap-3">
+                      <PhoneIcon className="w-5 h-5 text-slate-400" />
+                      <div className="flex-1">
+                        <p className="text-xs text-slate-500 font-medium">Số điện thoại</p>
+                        <p className="text-sm font-medium text-slate-900">{details?.phone_number || <span className="text-slate-400 italic">Chưa cập nhật</span>}</p>
+                      </div>
+                    </div>"""
+
+content = content.replace(old_phone, new_phone)
 
 with open(file_path, "w", encoding="utf-8") as f:
     f.write(content)
-print("Layout.jsx updated")
+print("Updated grid layout successfully")

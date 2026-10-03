@@ -72,7 +72,7 @@ export default function UserDetailPanel({ user, onClose, onEdit }) {
             <div className="px-5 py-5 border-b border-slate-100">
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xl font-bold">
-                  {details?.full_name?.charAt(0)}
+                  {(details?.full_name || '').split(' ').pop().charAt(0).toUpperCase()}
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-slate-900">{details?.full_name}</h3>
@@ -116,23 +116,28 @@ export default function UserDetailPanel({ user, onClose, onEdit }) {
               {/* INFO TAB */}
               {activeTab === 'info' && (
                 <div className="space-y-6">
-                  <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-y-6 gap-x-4">
                     <div className="flex items-center gap-3">
                       <EnvelopeIcon className="w-5 h-5 text-slate-400" />
                       <div className="flex-1">
-                        <p className="text-xs text-slate-500 font-medium">Email</p>
+                        <p className="text-xs text-slate-500 font-medium">Tên đăng nhập</p>
                         <p className="text-sm font-medium text-slate-900">{details?.email}</p>
                       </div>
                     </div>
-                    {details?.phone_number && (
-                      <div className="flex items-center gap-3">
-                        <PhoneIcon className="w-5 h-5 text-slate-400" />
-                        <div className="flex-1">
-                          <p className="text-xs text-slate-500 font-medium">Số điện thoại</p>
-                          <p className="text-sm font-medium text-slate-900">{details?.phone_number}</p>
-                        </div>
+                    <div className="flex items-center gap-3">
+                      <EnvelopeIcon className="w-5 h-5 text-slate-400" />
+                      <div className="flex-1">
+                        <p className="text-xs text-slate-500 font-medium">Email liên hệ</p>
+                        <p className="text-sm font-medium text-slate-900">{details?.contact_email || <span className="text-slate-400 italic">Chưa cập nhật</span>}</p>
                       </div>
-                    )}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <PhoneIcon className="w-5 h-5 text-slate-400" />
+                      <div className="flex-1">
+                        <p className="text-xs text-slate-500 font-medium">Số điện thoại</p>
+                        <p className="text-sm font-medium text-slate-900">{details?.phone_number || <span className="text-slate-400 italic">Chưa cập nhật</span>}</p>
+                      </div>
+                    </div>
                     <div className="flex items-center gap-3">
                       <CalendarIcon className="w-5 h-5 text-slate-400" />
                       <div className="flex-1">
@@ -234,13 +239,6 @@ export default function UserDetailPanel({ user, onClose, onEdit }) {
               {details?.is_active ? 'Khóa tài khoản' : 'Mở khóa tài khoản'}
             </button>
           </div>
-          <button 
-            onClick={handleResetPassword}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-200 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-300 transition-colors"
-          >
-            <KeyIcon className="w-4 h-4" />
-            Đặt lại mật khẩu
-          </button>
         </div>
 
       </div>

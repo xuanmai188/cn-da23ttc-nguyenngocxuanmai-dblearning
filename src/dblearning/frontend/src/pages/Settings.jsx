@@ -9,6 +9,7 @@ export default function Settings() {
   const [formData, setFormData] = useState({
     full_name: '',
     phone_number: '',
+    contact_email: '',
     email: '', // Email readonly for now to prevent lockout
     password: '',
     confirm_password: ''
@@ -23,6 +24,7 @@ export default function Settings() {
         ...prev,
         full_name: user.full_name || '',
         phone_number: user.phone_number || '',
+        contact_email: user.contact_email || '',
         email: user.email || ''
       }));
     }
@@ -49,6 +51,7 @@ export default function Settings() {
       const updateData = {
         full_name: formData.full_name,
         phone_number: formData.phone_number,
+        contact_email: formData.contact_email,
       };
       if (formData.password) {
         updateData.password = formData.password;
@@ -133,12 +136,30 @@ export default function Settings() {
                 <DevicePhoneMobileIcon className="h-5 w-5 text-gray-400" />
               </div>
               <input 
-                type="text" 
+                type="tel" 
                 name="phone_number"
                 value={formData.phone_number}
                 onChange={handleChange}
                 className="pl-10 w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
                 placeholder="Ví dụ: 0912345678"
+              />
+            </div>
+          </div>
+
+          {/* Contact Email */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Email liên hệ</label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <EnvelopeIcon className="h-5 w-5 text-gray-400" />
+              </div>
+              <input 
+                type="email" 
+                name="contact_email"
+                value={formData.contact_email}
+                onChange={handleChange}
+                className="pl-10 w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                placeholder="Ví dụ: nguyenvana@gmail.com"
               />
             </div>
           </div>

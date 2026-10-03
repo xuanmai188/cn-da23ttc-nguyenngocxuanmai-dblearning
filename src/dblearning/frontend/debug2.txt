@@ -1,0 +1,10 @@
+className="w-5 h-5 text-blue-600" />
+              <h2 className="text-lg font-bold text-slate-800">Hoạt động gần đây</h2>
+            </div>
+            <button onClick={() => navigate("/admin/reports")} className="text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer">Xem tất cả &rarr;</button>
+          </div>
+          <div className="space-y-4 mt-2">
+            {recentActivities.map((act) => (
+              <div key={act.id} className="flex items-start gap-4">
+                <div className={`p-2 rounded-lg mt-1 ${
+                  act.type === 'quiz' ? 'bg-rose-100 text-

@@ -10,6 +10,15 @@ class FlashcardBase(BaseModel):
     hint: Optional[str] = None
     order_index: int = 0
 
+class FlashcardCreate(FlashcardBase):
+    pass
+
+class FlashcardUpdate(BaseModel):
+    question: Optional[str] = None
+    answer: Optional[str] = None
+    hint: Optional[str] = None
+    order_index: Optional[int] = None
+
 class Flashcard(FlashcardBase):
     id: int
     item_id: int
@@ -30,6 +39,17 @@ class QuestionBase(BaseModel):
     explanation: Optional[str] = None
     difficulty: str = "medium"
     order_index: int = 0
+
+class QuestionCreate(QuestionBase):
+    pass
+
+class QuestionUpdate(BaseModel):
+    content: Optional[str] = None
+    options: Optional[List[str]] = None
+    correct_option: Optional[int] = None
+    explanation: Optional[str] = None
+    difficulty: Optional[str] = None
+    order_index: Optional[int] = None
 
 class Question(QuestionBase):
     id: int
@@ -57,6 +77,16 @@ class QuizBase(BaseModel):
     time_limit_minutes: int = 30
     pass_score: int = 60
     total_questions: int = 0
+
+class QuizCreate(QuizBase):
+    item_id: int
+
+class QuizUpdate(BaseModel):
+    item_id: Optional[int] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    time_limit_minutes: Optional[int] = None
+    pass_score: Optional[int] = None
 
 class Quiz(QuizBase):
     id: int

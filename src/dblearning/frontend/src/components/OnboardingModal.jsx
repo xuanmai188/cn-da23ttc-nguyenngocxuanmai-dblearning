@@ -1,101 +1,171 @@
-﻿import { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { learningApi } from '../api/learningApi';
 import { recommendationApi } from '../api/recommendationApi';
 
 export default function OnboardingModal({ onComplete }) {
-  const [topics, setTopics] = useState([]);
-  const [selectedTopics, setSelectedTopics] = useState([]);
-  const [difficulty, setDifficulty] = useState('beginner');
-  const [loading, setLoading] = useState(false);
+  const [survey, setSurvey] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [answers, setAnswers] = useState({});
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    learningApi.getTopics().then(setTopics).catch(console.error);
+    fetchActiveSurvey();
   }, []);
 
-  const toggleTopic = (id) => {
-    setSelectedTopics(prev => 
-      prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]
-    );
-  };
-
-  const handleSubmit = async () => {
-    if (selectedTopics.length === 0) return alert("Vui lòng chọn ít nhất 1 chủ đề");
-    setLoading(true);
+  const fetchActiveSurvey = async () => {
     try {
-      await recommendationApi.submitOnboarding({
-        preferred_difficulty: difficulty,
-        interested_topic_ids: selectedTopics
-      });
-      onComplete(); // callback to refresh dashboard
+      const data = await recommendationApi.getActiveSurvey();
+      setSurvey(data);
     } catch (err) {
-      console.error(err);
-      alert("Đã xảy ra lỗi khi lưu khảo sát.");
+      console.error("Lỗi lấy survey:", err);
+      // Nếu không có khảo sát nào đang hoạt động, có thể bỏ qua onboarding
+      if (err.response?.status === 404) {
+        await recommendationApi.skipOnboarding();
+        onComplete();
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  const handleSelectOption = (questionId, optionId, isMultiple) => {
+    setAnswers(prev => {
+      const current = prev[questionId] || [];
+      if (isMultiple) {
+        if (current.includes(optionId)) {
+          return { ...prev, [questionId]: current.filter(id => id !== optionId) };
+        } else {
+          return { ...prev, [questionId]: [...current, optionId] };
+        }
+      } else {
+        return { ...prev, [questionId]: [optionId] };
+      }
+    });
+  };
+
+  const handleTextChange = (questionId, text) => {
+    setAnswers(prev => ({ ...prev, [questionId]: text }));
+  };
+
+  const handleSubmit = async () => {
+    if (!survey) return;
+    
+    // Validate required questions
+    for (const q of survey.questions) {
+      if (q.is_required) {
+        const ans = answers[q.id];
+        if (!ans || (Array.isArray(ans) && ans.length === 0) || (typeof ans === 'string' && ans.trim() === '')) {
+          alert('Vui lòng trả lời đầy đủ các câu hỏi bắt buộc.');
+          return;
+        }
+      }
+    }
+
+    setSubmitting(true);
+    
+    // Format payload
+    const formattedAnswers = Object.keys(answers).map(qId => {
+      const q = survey.questions.find(x => x.id === parseInt(qId));
+      const ans = answers[qId];
+      if (q.question_type === 'text') {
+        return { question_id: parseInt(qId), option_ids: [], text_value: ans };
+      } else {
+        return { question_id: parseInt(qId), option_ids: ans, text_value: null };
+      }
+    });
+
+    try {
+      await recommendationApi.submitSurvey(survey.id, { answers: formattedAnswers });
+      onComplete();
+    } catch (err) {
+      console.error(err);
+      alert("Đã xảy ra lỗi khi lưu kết quả khảo sát.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+      </div>
+    );
+  }
+
+  if (!survey) {
+    return null; // Will trigger onComplete directly in useEffect
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 py-10 overflow-y-auto">
       <motion.div 
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className="bg-white rounded-2xl shadow-2xl p-8 max-w-2xl w-full"
+        className="bg-white rounded-2xl shadow-2xl p-8 max-w-3xl w-full my-auto"
       >
-        <h2 className="text-3xl font-bold text-gray-900 mb-2">Chào mừng bạn đến với DBLearning! 🎉</h2>
-        <p className="text-gray-600 mb-8">Để bắt đầu, hãy cho AI biết mục tiêu học tập của bạn để chúng tôi xây dựng lộ trình tốt nhất nhé.</p>
+        <h2 className="text-3xl font-bold text-gray-900 mb-2">{survey.title}</h2>
+        {survey.description && (
+          <p className="text-gray-600 mb-8">{survey.description}</p>
+        )}
 
-        <div className="mb-8">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">1. Đánh giá mức độ hiện tại của bạn:</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {[
-              { id: 'beginner', label: 'Người mới bắt đầu', desc: 'Chưa biết gì về Database' },
-              { id: 'intermediate', label: 'Đã biết cơ bản', desc: 'Cần củng cố và nâng cao' },
-              { id: 'advanced', label: 'Nâng cao', desc: 'Tập trung chuyên sâu' }
-            ].map(lvl => (
-              <div 
-                key={lvl.id}
-                onClick={() => setDifficulty(lvl.id)}
-                className={`cursor-pointer rounded-xl p-4 border-2 transition-all ${
-                  difficulty === lvl.id ? 'border-indigo-600 bg-indigo-50' : 'border-gray-200 hover:border-indigo-300'
-                }`}
-              >
-                <div className="font-semibold text-gray-900">{lvl.label}</div>
-                <div className="text-xs text-gray-500 mt-1">{lvl.desc}</div>
+        <div className="space-y-8">
+          {survey.questions.map((q, index) => {
+            const isMultiple = q.question_type === 'multiple_choice';
+            const currentAns = answers[q.id] || [];
+
+            return (
+              <div key={q.id} className="border-b border-gray-100 pb-6 last:border-0 last:pb-0">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                  {index + 1}. {q.content}
+                  {q.is_required && <span className="text-red-500 ml-1">*</span>}
+                </h3>
+                
+                {q.question_type === 'text' ? (
+                  <textarea
+                    className="w-full border border-gray-300 rounded-lg p-3 outline-none focus:ring-2 focus:ring-blue-500"
+                    rows={3}
+                    placeholder="Nhập câu trả lời của bạn..."
+                    value={answers[q.id] || ''}
+                    onChange={e => handleTextChange(q.id, e.target.value)}
+                  />
+                ) : (
+                  <div className={`grid gap-3 ${q.options.length > 4 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+                    {q.options.map(opt => {
+                      const isSelected = Array.isArray(currentAns) && currentAns.includes(opt.id);
+                      return (
+                        <div 
+                          key={opt.id}
+                          onClick={() => handleSelectOption(q.id, opt.id, isMultiple)}
+                          className={`cursor-pointer rounded-xl p-4 border-2 transition-all flex items-center gap-3 ${
+                            isSelected ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-blue-300'
+                          }`}
+                        >
+                          <div className={`w-5 h-5 flex-shrink-0 flex items-center justify-center border-2 ${isMultiple ? 'rounded' : 'rounded-full'} ${isSelected ? 'border-blue-600 bg-blue-600' : 'border-gray-300'}`}>
+                            {isSelected && <div className={`bg-white ${isMultiple ? 'w-2 h-2' : 'w-2 h-2 rounded-full'}`} />}
+                          </div>
+                          <div className={`font-medium ${isSelected ? 'text-blue-900' : 'text-gray-700'}`}>
+                            {opt.content}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
 
-        <div className="mb-8">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">2. Bạn muốn tập trung vào chủ đề nào nhất? (Chọn nhiều)</h3>
-          <div className="flex flex-wrap gap-3">
-            {topics.map(t => (
-              <button
-                key={t.id}
-                onClick={() => toggleTopic(t.id)}
-                className={`px-4 py-2 rounded-full border transition-all ${
-                  selectedTopics.includes(t.id) 
-                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' 
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                {t.name}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex justify-end">
+        <div className="flex justify-end mt-8 pt-6 border-t border-gray-100">
           <button
             onClick={handleSubmit}
-            disabled={loading || selectedTopics.length === 0}
+            disabled={submitting}
             className={`px-8 py-3 rounded-lg font-bold text-white transition-all ${
-              loading || selectedTopics.length === 0 ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 shadow-lg'
+              submitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 shadow-lg'
             }`}
           >
-            {loading ? 'Đang xử lý...' : 'Bắt đầu hành trình'}
+            {submitting ? 'Đang xử lý...' : 'Hoàn thành Khảo sát'}
           </button>
         </div>
       </motion.div>

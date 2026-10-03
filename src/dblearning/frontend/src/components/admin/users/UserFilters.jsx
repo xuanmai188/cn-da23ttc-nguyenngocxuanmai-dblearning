@@ -26,7 +26,7 @@ export default function UserFilters({ filters, setFilters, onFilter, onReset }) 
         <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
         <input
           type="text"
-          placeholder="Tìm kiếm theo tên, email, MSSV..."
+          placeholder="Tìm kiếm theo tên, email..."
           className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-colors"
           value={localSearch}
           onChange={(e) => setLocalSearch(e.target.value)}
@@ -36,31 +36,9 @@ export default function UserFilters({ filters, setFilters, onFilter, onReset }) 
       {/* Filters Row */}
       <div className="flex flex-col sm:flex-row items-end justify-between gap-4">
         <div className="flex flex-wrap items-end gap-4 flex-1">
-          <div className="flex-1 min-w-[150px] max-w-[250px]">
-            <label className="block text-xs font-medium text-slate-500 mb-1.5">Vai trò</label>
-            <select 
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-              value={filters.role}
-              onChange={(e) => setFilters(prev => ({ ...prev, role: e.target.value }))}
-            >
-              <option value="all">Tất cả</option>
-              <option value="student">Sinh viên</option>
-              <option value="admin">Quản trị viên</option>
-            </select>
-          </div>
           
-          <div className="flex-1 min-w-[150px] max-w-[250px]">
-            <label className="block text-xs font-medium text-slate-500 mb-1.5">Trạng thái</label>
-            <select 
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-              value={filters.status}
-              onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-            >
-              <option value="all">Tất cả</option>
-              <option value="active">Hoạt động</option>
-              <option value="inactive">Tạm khóa</option>
-            </select>
-          </div>
+          
+          
           
           <div className="flex-1 min-w-[180px] max-w-[250px]">
             <label className="block text-xs font-medium text-slate-500 mb-1.5">Ngày đăng ký</label>

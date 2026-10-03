@@ -8,9 +8,13 @@ export default function Register() {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    full_name: ''
+    full_name: '',
+    contact_email: '',
+    phone_number: ''
   });
   const [error, setError] = useState('');
+  const [confirmPasswordError, setConfirmPasswordError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({ contact_email: '', phone_number: '' });
   const [isLoading, setIsLoading] = useState(false);
   
   // Password validation states
@@ -39,13 +43,50 @@ export default function Register() {
   const isPasswordValid = Object.values(validations).every(Boolean);
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+    
+    if (name === 'contact_email') {
+      const emailRegex = /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/;
+      if (value && !emailRegex.test(value)) {
+        setFieldErrors(prev => ({ ...prev, contact_email: 'Email không hợp lệ (Ví dụ: name@gmail.com)' }));
+      } else {
+        setFieldErrors(prev => ({ ...prev, contact_email: '' }));
+      }
+    }
+    
+    if (name === 'phone_number') {
+      const phoneRegex = /^(0|\+84)[3|5|7|8|9][0-9]{8}$/;
+      if (value && !phoneRegex.test(value)) {
+        setFieldErrors(prev => ({ ...prev, phone_number: 'Phải gồm 10 số và bắt đầu bằng đầu số VN hợp lệ' }));
+      } else {
+        setFieldErrors(prev => ({ ...prev, phone_number: '' }));
+      }
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.full_name || !formData.email || !formData.contact_email || !formData.phone_number) {
+      setError('Vui lòng điền đầy đủ các thông tin bắt buộc (*)');
+      return;
+    }
     if (!isPasswordValid) {
       setError('Vui lòng nhập mật khẩu đáp ứng đủ các yêu cầu bảo mật.');
+      return;
+    }
+    
+    // Validate email
+    const emailRegex = /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/;
+    if (!emailRegex.test(formData.contact_email)) {
+      setError('Email liên hệ không hợp lệ. Vui lòng kiểm tra lại.');
+      return;
+    }
+
+    // Validate phone (10 digits)
+    const phoneRegex = /^(0|\+84)[3|5|7|8|9][0-9]{8}$/;
+    if (!phoneRegex.test(formData.phone_number)) {
+      setError('Số điện thoại không hợp lệ. Phải gồm 10 chữ số và bắt đầu hợp lệ ở VN.');
       return;
     }
 
@@ -91,9 +132,9 @@ export default function Register() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-5" noValidate>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Họ và Tên</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Họ và Tên <span className="text-red-500">*</span></label>
             <input
               type="text"
               name="full_name"
@@ -106,7 +147,35 @@ export default function Register() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tên đăng nhập</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email liên hệ <span className="text-red-500">*</span></label>
+            <input
+              type="email"
+              name="contact_email"
+              required
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:border-primary-500 outline-none transition-colors ${fieldErrors.contact_email ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-primary-500'}`}
+              placeholder="Ví dụ: nguyenvana@gmail.com"
+              value={formData.contact_email}
+              onChange={handleChange}
+            />
+            {fieldErrors.contact_email && <p className="text-red-500 text-xs mt-1.5">{fieldErrors.contact_email}</p>}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Số điện thoại <span className="text-red-500">*</span></label>
+            <input
+              type="tel"
+              name="phone_number"
+              required
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:border-primary-500 outline-none transition-colors ${fieldErrors.phone_number ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-primary-500'}`}
+              placeholder="Ví dụ: 0987654321"
+              value={formData.phone_number}
+              onChange={handleChange}
+            />
+            {fieldErrors.phone_number && <p className="text-red-500 text-xs mt-1.5">{fieldErrors.phone_number}</p>}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Tên đăng nhập <span className="text-red-500">*</span></label>
             <input
               type="text"
               name="email"
@@ -119,7 +188,7 @@ export default function Register() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu <span className="text-red-500">*</span></label>
             <input
               type="password"
               name="password"
@@ -130,19 +199,36 @@ export default function Register() {
               onChange={handleChange}
             />
             
-            <div className="mt-4 p-4 bg-gray-50 rounded-lg space-y-2 border border-gray-100">
-              <p className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wider">Yêu cầu bảo mật:</p>
-              <ValidationItem isValid={validations.length} label="Ít nhất 8 ký tự" />
-              <ValidationItem isValid={validations.uppercase} label="Có ký tự chữ IN HOA" />
-              <ValidationItem isValid={validations.lowercase} label="Có ký tự chữ thường" />
-              <ValidationItem isValid={validations.number} label="Có ký tự số" />
-              <ValidationItem isValid={validations.special} label="Có ký tự đặc biệt (!@#...)" />
-            </div>
+            {formData.password && !isPasswordValid && (
+              <p className="text-red-500 text-xs mt-1.5">Mật khẩu cần ít nhất 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt.</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nhập lại mật khẩu <span className="text-red-500">*</span></label>
+            <input
+              type="password"
+              name="confirm_password"
+              required
+              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${
+                confirmPasswordError ? 'border-red-500 focus:ring-red-200 focus:border-red-500' : 'border-gray-300 focus:ring-primary-500 focus:border-primary-500'
+              }`}
+              placeholder="Nhập lại mật khẩu của bạn"
+              value={formData.confirm_password}
+              onChange={(e) => {
+                setFormData({...formData, confirm_password: e.target.value});
+                if (e.target.value === formData.password) setConfirmPasswordError('');
+                else setConfirmPasswordError('Mật khẩu nhập lại không khớp');
+              }}
+            />
+            {confirmPasswordError && (
+              <p className="text-red-500 text-xs mt-1.5">{confirmPasswordError}</p>
+            )}
           </div>
 
           <button
             type="submit"
-            disabled={isLoading || !isPasswordValid}
+            disabled={isLoading || !isPasswordValid || !!fieldErrors.contact_email || !!fieldErrors.phone_number}
             className="w-full bg-primary-600 text-white py-2.5 rounded-lg font-semibold hover:bg-primary-700 transition-colors focus:ring-4 focus:ring-primary-200 disabled:opacity-50 disabled:cursor-not-allowed flex justify-center mt-6"
           >
             {isLoading ? 'Đang xử lý...' : 'Đăng ký ngay'}

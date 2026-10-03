@@ -1,0 +1,61 @@
+seState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { adminApi } from '../../api/adminApi';
+import { motion } from 'framer-motion';
+import { 
+  UsersIcon, 
+  BookOpenIcon, 
+  ClipboardDocumentCheckIcon, 
+  ChartBarSquareIcon,
+  CalendarDaysIcon,
+  TrophyIcon,
+  FireIcon,
+  ClockIcon,
+  ArrowTrendingUpIcon,
+  CheckBadgeIcon,
+  DocumentTextIcon,
+  PlayIcon,
+  AcademicCapIcon
+} from '@heroicons/react/24/outline';
+import { 
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend
+} from 'recharts';
+
+export default function AdminDashboard() {
+  const navigate = useNavigate();
+  const [stats, setStats] = useState(null);
+  const [userGrowth, setUserGrowth] = useState([]);
+  const [topicStats, setTopicStats] = useState([]);
+  const [performance, setPerformance] = useState(null);
+  const [activeStudents, setActiveStudents] = useState([]);
+  const [popularLessons, setPopularLessons] = useState([]);
+  const [recentActivities, setRecentActivities] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const [
+          statsData, growthData, topicData, perfData, 
+          studentsData, lessonsData, activityData
+        ] = await Promise.all([
+          adminApi.getDashboardStats(),
+          adminApi.getUserGrowthChart(),
+          adminApi.getTopicLearningChart(),
+          adminApi.getPerformanceStats(),
+          adminApi.getActiveStudents(),
+          adminApi.getPopularLessons(),
+          adminApi.getRecentActivities()
+        ]);
+        
+        // Format dates in userGrowth to DD/MM
+        const formattedGrowth = growthData.map(d => {
+          const date = new Date(d.date);
+          return { ...d, displayDate: `${date.getDate()}/${date.getMonth() + 1}` };
+        });
+
+        setStats(statsData);
+        setUserGrowth(formattedGrowth);
+        setTopicStats(topicData);
+        setPerf

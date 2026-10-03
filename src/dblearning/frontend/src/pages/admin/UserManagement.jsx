@@ -82,14 +82,23 @@ export default function UserManagement() {
     }, 0);
   };
 
-  const handleAction = (type, user) => {
+  const handleAction = async (type, user) => {
     if (type === 'view') {
       setSelectedUser(user);
     } else if (type === 'edit') {
       setEditUser(user);
       setIsModalOpen(true);
-    } else if (type === 'more') {
-      alert(`Menu thao tác cho ${user.full_name}`);
+    } else if (type === 'toggle_active') {
+      const actionText = user.is_active ? 'khóa' : 'mở khóa';
+      if (window.confirm(`Bạn có chắc chắn muốn ${actionText} tài khoản của ${user.full_name}?`)) {
+        try {
+          await adminApi.updateUser(user.id, { is_active: !user.is_active });
+          fetchUsers(); // Refresh the list
+        } catch (error) {
+          console.error("Failed to toggle active status", error);
+          alert('Có lỗi xảy ra khi cập nhật trạng thái.');
+        }
+      }
     }
   };
 
@@ -146,16 +155,18 @@ export default function UserManagement() {
       </div>
 
 
+      {/* Filters */}
+      <div className="mb-6">
+        <UserFilters 
+          filters={filters} 
+          setFilters={setFilters} 
+          onFilter={handleFilter} 
+          onReset={handleResetFilters} 
+        />
+      </div>
+
       <div className="flex flex-col lg:flex-row gap-6 items-start">
         <div className="flex-1 min-w-0 w-full">
-          {/* Filters */}
-          <UserFilters 
-            filters={filters} 
-            setFilters={setFilters} 
-            onFilter={handleFilter} 
-            onReset={handleResetFilters} 
-          />
-
           {/* Table */}
           <UserTable 
             users={users} 

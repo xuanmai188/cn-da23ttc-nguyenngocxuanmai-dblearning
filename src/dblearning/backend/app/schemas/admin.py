@@ -69,6 +69,8 @@ class UserItem(BaseModel):
     id: int
     email: str
     full_name: str
+    phone_number: Optional[str] = None
+    contact_email: Optional[str] = None
     role: str
     is_active: bool
     created_at: datetime

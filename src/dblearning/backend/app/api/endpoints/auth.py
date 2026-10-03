@@ -32,6 +32,8 @@ def register(
         email=user_in.email,
         password_hash=security.get_password_hash(user_in.password),
         full_name=user_in.full_name,
+        phone_number=user_in.phone_number,
+        contact_email=user_in.contact_email,
         avatar_url=user_in.avatar_url,
     )
     db.add(user)
@@ -156,6 +158,8 @@ def update_user_me(
         current_user.full_name = user_in.full_name
     if user_in.phone_number is not None:
         current_user.phone_number = user_in.phone_number
+    if user_in.contact_email is not None:
+        current_user.contact_email = user_in.contact_email
     if user_in.avatar_url is not None:
         current_user.avatar_url = user_in.avatar_url
     if user_in.password is not None:

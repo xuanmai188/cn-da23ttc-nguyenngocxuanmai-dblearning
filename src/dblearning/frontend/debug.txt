@@ -1,0 +1,13 @@
+n className="w-5 h-5 text-amber-500" />
+              <h2 className="text-lg font-bold text-slate-800">Sinh viên hoạt động nhiều nhất</h2>
+            </div>
+            <button onClick={() => navigate("/admin/users")} className="text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer">Xem tất cả &rarr;</button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-y border-slate-100">
+                <tr>
+                  <th className="px-4 py-3 font-medium">#</th>
+                  <th className="px-4 py-3 font-medium">Tên sinh viên</th>
+                  <th className="px-4 py-3 font-medium text-center">Bài học đã học</th>
+   

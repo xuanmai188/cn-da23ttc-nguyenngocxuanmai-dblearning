@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { adminApi } from '../../api/adminApi';
 import { motion } from 'framer-motion';
 import { 
@@ -22,6 +23,7 @@ import {
 } from 'recharts';
 
 export default function AdminDashboard() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [userGrowth, setUserGrowth] = useState([]);
   const [topicStats, setTopicStats] = useState([]);
@@ -29,6 +31,9 @@ export default function AdminDashboard() {
   const [activeStudents, setActiveStudents] = useState([]);
   const [popularLessons, setPopularLessons] = useState([]);
   const [recentActivities, setRecentActivities] = useState([]);
+  const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
+  const [fullActivities, setFullActivities] = useState([]);
+  const [loadingActivities, setLoadingActivities] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -111,6 +116,19 @@ export default function AdminDashboard() {
   // Helper for pie chart colors if API doesn't provide enough
   const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#F43F5E', '#64748B'];
 
+
+  const handleViewAllActivities = async () => {
+    setIsActivityModalOpen(true);
+    setLoadingActivities(true);
+    try {
+      const data = await adminApi.getRecentActivities(50); // Fetch up to 50
+      setFullActivities(data);
+    } catch (err) {
+      console.error('Failed to fetch full activities', err);
+    } finally {
+      setLoadingActivities(false);
+    }
+  };
   return (
     <div className="space-y-6">
       {/* Header Area */}
@@ -143,10 +161,12 @@ export default function AdminDashboard() {
                 <p className="text-sm font-medium text-slate-500">{stat.name}</p>
                 <div className="flex items-end justify-end gap-2 mt-1">
                   <span className="text-3xl font-bold text-slate-900 leading-none">{stat.value}</span>
-                  <span className="flex items-center text-sm font-semibold text-green-600 mb-0.5">
-                    <ArrowTrendingUpIcon className="w-4 h-4 mr-0.5" />
-                    {stat.increase}%
-                  </span>
+                  {stat.increase > 0 && (
+                    <span className="flex items-center text-sm font-semibold text-green-600 mb-0.5">
+                      <ArrowTrendingUpIcon className="w-4 h-4 mr-0.5" />
+                      +{stat.increase} mới
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -254,7 +274,7 @@ export default function AdminDashboard() {
               <TrophyIcon className="w-5 h-5 text-amber-500" />
               <h2 className="text-lg font-bold text-slate-800">Sinh viên hoạt động nhiều nhất</h2>
             </div>
-            <button className="text-sm font-medium text-blue-600 hover:text-blue-700">Xem tất cả &rarr;</button>
+            <button onClick={handleViewAllActivities} className="text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer">Xem tất cả &rarr;</button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
@@ -275,7 +295,7 @@ export default function AdminDashboard() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">
-                          {student.full_name.charAt(0)}
+                          {(student.full_name || '').split(' ').pop().charAt(0).toUpperCase()}
                         </div>
                         <span className="font-medium text-slate-900">{student.full_name}</span>
                       </div>
@@ -302,7 +322,7 @@ export default function AdminDashboard() {
               <FireIcon className="w-5 h-5 text-red-500" />
               <h2 className="text-lg font-bold text-slate-800">Bài học truy cập nhiều nhất</h2>
             </div>
-            <button className="text-sm font-medium text-blue-600 hover:text-blue-700">Xem tất cả &rarr;</button>
+            <button onClick={handleViewAllActivities} className="text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer">Xem tất cả &rarr;</button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
@@ -336,7 +356,7 @@ export default function AdminDashboard() {
               <ClockIcon className="w-5 h-5 text-blue-600" />
               <h2 className="text-lg font-bold text-slate-800">Hoạt động gần đây</h2>
             </div>
-            <button className="text-sm font-medium text-blue-600 hover:text-blue-700">Xem tất cả &rarr;</button>
+            <button onClick={handleViewAllActivities} className="text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer">Xem tất cả &rarr;</button>
           </div>
           <div className="space-y-4 mt-2">
             {recentActivities.map((act) => (
@@ -363,6 +383,63 @@ export default function AdminDashboard() {
 
       </div>
 
+
+      {/* Activity Log Modal */}
+      {isActivityModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                  <ClockIcon className="w-6 h-6" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-slate-800">Nhật ký hoạt động</h2>
+                  <p className="text-sm text-slate-500">Danh sách 50 hoạt động gần đây nhất của sinh viên</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsActivityModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1">
+              {loadingActivities ? (
+                <div className="text-center py-12 text-slate-500">Đang tải dữ liệu...</div>
+              ) : fullActivities.length === 0 ? (
+                <div className="text-center py-12 text-slate-500">Chưa có hoạt động nào.</div>
+              ) : (
+                <div className="space-y-4">
+                  {fullActivities.map((act) => (
+                    <div key={act.id} className="flex items-start gap-4 p-3 hover:bg-slate-50 rounded-xl transition-colors">
+                      <div className={`p-2 rounded-lg mt-1 ${
+                        act.type === 'quiz' ? 'bg-rose-100 text-rose-600' : 
+                        act.type === 'flashcard_set' ? 'bg-amber-100 text-amber-600' :
+                        'bg-blue-100 text-blue-600'
+                      }`}>
+                        {act.type === 'quiz' ? <CheckBadgeIcon className="w-5 h-5" /> : 
+                         act.type === 'flashcard_set' ? <DocumentTextIcon className="w-5 h-5" /> :
+                         <PlayIcon className="w-5 h-5" />}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-slate-700">
+                          <span className="font-semibold text-slate-900">{act.user_name}</span> {act.action} <span className="font-medium">{act.item_title}</span>
+                        </p>
+                        <p className="text-sm text-slate-500 mt-1">{act.time_ago}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
